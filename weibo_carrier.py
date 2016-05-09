@@ -19,7 +19,7 @@ LAYOUT_ONE = {'date_size': 145, 'post_size': 52, 'date_site': (20, -25), 'text_s
 LAYOUT_TWO = {'date_size': 145, 'post_size': 52, 'date_site': (20, -25), 'text_site': (40, 335),
               'post_spacing': 26, 'date_spacing': -5, 'line_sum': 8, 'line_interval': 87, 'LAYOUT_TWO': None}
 # Regular style
-LAYOUT_THREE = {'date_size': 48, 'post_size': 50, 'date_site': (65, 60), 'text_site': (65, 190),
+LAYOUT_THREE = {'date_size': 50, 'post_size': 50, 'date_site': (65, 60), 'text_site': (65, 190),
                 'post_spacing': 26, 'line_sum': 10, 'line_interval': 85}  # (65, 200) 28  4/25
 
 # Color scheme
@@ -225,7 +225,6 @@ def traversal_weibo(url_target, weibo_name, page_sum):
             weibo_name: weibo name of your target user
         """
     global page_counter
-
     for i in range(1, int(page_sum) + 1):  # search in all pages  range(1, int(page_sum) + 1)
         url = url_target.replace('page=1', 'page=%s' % i)
         html = session.get(url, headers=HEADER).content  # 获取页面源代码
@@ -504,9 +503,9 @@ def layout(formatted_post, formatted_post_date, line_counter, post_name, weibo_n
             draw.multiline_text((0, 0), '█\n' * int(line_counter / 12 + 1), font=font_bg, fill=COLOR_SCHEME['text'], spacing=-173)
         draw.multiline_text(LAYOUT['date_site'], formatted_post_date, font=font_date, fill=COLOR_SCHEME['text'], spacing=LAYOUT['date_spacing'])
         if LAYOUT == LAYOUT_ONE:
-            draw.multiline_text(LAYOUT['text_site'], formatted_post, font=font_post, fill=COLOR_SCHEME['text'], spacing=LAYOUT['post_spacing'])
-        elif LAYOUT == LAYOUT_TWO:
             draw.multiline_text(LAYOUT['text_site'], formatted_post, font=font_post, fill=COLOR_SCHEME['bg'], spacing=LAYOUT['post_spacing'])
+        elif LAYOUT == LAYOUT_TWO:
+            draw.multiline_text(LAYOUT['text_site'], formatted_post, font=font_post, fill=COLOR_SCHEME['text'], spacing=LAYOUT['post_spacing'])
     elif LAYOUT == LAYOUT_THREE:
         font_date = ImageFont.truetype(os.path.join(os.path.abspath('font'), FONT), LAYOUT['date_size'])
         font_post = ImageFont.truetype(os.path.join(os.path.abspath('font'), FONT), LAYOUT['post_size'])
