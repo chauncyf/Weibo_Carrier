@@ -3,6 +3,9 @@
 #                       __
 # \  /\  / _    /      /    _          _
 #  \/  \/ (- / /) ()  /__  (/ /- /- / (- /-
+#
+# author: Chauncy Grey
+# contact: chauncygrey@foxmail.com
 
 import os
 import re
@@ -10,6 +13,7 @@ import time
 import requests
 from lxml import etree
 from PIL import Image, ImageDraw, ImageFont
+
 
 # Layout
 # Material style with colored date bar
@@ -40,11 +44,11 @@ WHITE = {'bg': '#FFFFFF', 'text': '#212121'}
 DARK_GREY = {'bg': '#424242', 'text': '#FFFFFF'}
 BLACK = {'bg': '#000000', 'text': '#FFFFFF'}
 
-CH_PUN = ['”', '’', '，', '。', '、', '：', '；', '！', '？', '）', '】', '}', '》']
+CH_PUN = ['”', '’', '，', '。', '、', '：', '；', '！', '？', '）', '】', '}', '》', '」']
 EN_PUN = ['"', "'", ',', '.', ':', ';', '!', '?', ')', ']', '}', '>']
 
 LAYOUT = LAYOUT_ONE
-COLOR_SCHEME = LIGHT_GREY
+COLOR_SCHEME = CYAN
 FONT = 'NotoSansCJKsc-DemiLight.otf'  # NotoSansCJKsc-DemiLight.otf  NotoSansCJKsc-Light.otf  NotoSansMonoCJKsc-Regular.otf
 
 HEADER = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36',
@@ -231,21 +235,19 @@ def traversal_weibo(url_target, weibo_name, page_sum):
         time.sleep(1)  # 等待页面加载
         target = etree.HTML(html)
         page_counter += 1
-        for j in range(1, 11):  # by default each page have 10 posts
-            try:
-                post = target.xpath('//*[starts-with(@id, "M_")][%s]/div[1]/span[@class="ctt"]' % j)[0].xpath('string(.)')
-                if '全文' in post[-2:]:
-                    whole_post_url = 'http://weibo.cn/comment/' + target.xpath('//*[starts-with(@id, "M_")][%s]/@id' % j)[0][2:]
-                    whole_post = session.get(whole_post_url, headers=HEADER).content
-                    whole_post_tmp = etree.HTML(whole_post)
-                    post = whole_post_tmp.xpath('//*[@id="M_"]/div[1]/span[@class="ctt"]')[0].xpath('string(.)')[1:]
-            except IndexError:  # 到头了
-                continue
-            div_sum = target.xpath('//*[starts-with(@id, "M_")][%s]/div' % j)
+        post_in_page = target.xpath('//*[starts-with(@id, "M_")]/@id')
+        for post_id in post_in_page:
+            post = target.xpath('//*[@id="%s"]/div[1]/span[@class="ctt"]' % post_id)[0].xpath('string(.)')
+            if '全文' in post[-2:]:
+                whole_post_url = 'http://weibo.cn/comment/' + post_id[2:]
+                whole_post = session.get(whole_post_url, headers=HEADER).content
+                whole_post_tmp = etree.HTML(whole_post)
+                post = whole_post_tmp.xpath('//*[@id="M_"]/div[1]/span[@class="ctt"]')[0].xpath('string(.)')[1:]
+            div_sum = target.xpath('//*[@id="%s"]/div' % post_id)
             if len(div_sum) == 1:  # 没图的情况
-                post_info = target.xpath('//*[starts-with(@id, "M_")][%s]/div[1]/span[@class="ct"]/text()' % j)[0]
+                post_info = target.xpath('//*[@id="%s"]/div[1]/span[@class="ct"]/text()' % post_id)[0]
             elif len(div_sum) == 2:  # 有图的情况
-                post_info = target.xpath('//*[starts-with(@id, "M_")][%s]/div[2]/span[@class="ct"]/text()' % j)[0]
+                post_info = target.xpath('//*[@id="%s"]/div[2]/span[@class="ct"]/text()' % post_id)[0]
 
             post_date, post_date_print = get_date(post_info)
             print_log('\n%s               (page %s of %s)' % (post_info, i, page_sum))
@@ -429,6 +431,7 @@ def change_line(post, i, formatted_post, width_counter, line_counter):
 
 
 def format_post(post, formatted_post_date):
+    # todo add space after , and . if not
     width_counter = 0
     line_counter = 1
     formatted_post = ''
@@ -436,18 +439,28 @@ def format_post(post, formatted_post_date):
         if post[i] == ' ' and width_counter == 0:  # 去掉行首的空格
             pass
         elif post[i] in CH_PUN and width_counter == 0:  # 去掉行首的全角标点
-            if post[i - 1] not in CH_PUN:
-                formatted_post = formatted_post[:-2] + '\n' + formatted_post[-2:-1] + post[i]
-                width_counter = count_width(i - 1, post) + count_width(i, post)
-            elif post[i - 1] in CH_PUN or post[i + 1] in CH_PUN:
-                formatted_post += post[i]
-                width_counter = count_width(i, post)
-        elif post[i] in EN_PUN and width_counter == 0:  # 去掉行首的半角标点
-            if post[i - 1] in EN_PUN or post[i + 1] in EN_PUN:
-                formatted_post += post[i]
-                width_counter = count_width(i, post)
+            if i == (len(post) - 1):
+                if post[i] != post[i - 1]:
+                    formatted_post = formatted_post[:-2] + '\n' + formatted_post[-2:-1] + post[i]
+                else:
+                    formatted_post += post[i]
             else:
+                if post[i - 1] != post[i] and post[i + 1] != post[i]:
+                    formatted_post = formatted_post[:-2] + '\n' + formatted_post[-2:-1] + post[i]
+                    width_counter = count_width(i - 1, post) + count_width(i, post)
+                else:
+                    formatted_post += post[i]
+                    width_counter = count_width(i, post)
+        elif post[i] in EN_PUN and width_counter == 0:  # 去掉行首的半角标点
+            # fixme don't isn't it's
+            if i == (len(post) - 1):
                 formatted_post = formatted_post[:-1] + post[i] + '\n'
+            else:
+                if post[i - 1] != post[i] and post[i + 1] != post[i]:
+                    formatted_post = formatted_post[:-1] + post[i] + '\n'
+                else:
+                    formatted_post += post[i]
+                    width_counter = count_width(i, post)
         elif post[i] == ' ' and i != (len(post) - 1):
             if FONT == 'NotoSansCJKsc-DemiLight.otf' or FONT == 'NotoSansCJKsc-Light.otf':
                 if 32 <= ord(post[i - 1]) <= 126 or 32 <= ord(post[i + 1]) <= 126:
