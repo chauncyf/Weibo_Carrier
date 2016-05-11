@@ -48,7 +48,7 @@ CH_PUN = ['”', '’', '，', '。', '、', '：', '；', '！', '？', '）', 
 EN_PUN = ['"', "'", ',', '.', ':', ';', '!', '?', ')', ']', '}', '>']
 
 LAYOUT = LAYOUT_ONE
-COLOR_SCHEME = CYAN
+COLOR_SCHEME = LIGHT_GREY
 FONT = 'NotoSansCJKsc-DemiLight.otf'  # NotoSansCJKsc-DemiLight.otf  NotoSansCJKsc-Light.otf  NotoSansMonoCJKsc-Regular.otf
 
 HEADER = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36',
@@ -216,9 +216,10 @@ def get_date(post_info):
         post_date = time.strftime('%y-%m-%d ') + post_info[3:8]
     else:  # 今年之前的微博  'xxxx-xx-xx xx:xx:xx 来自xxxx'
         post_date = post_info[2:16]
-    post_date_print = time.strptime(post_date, '%y-%m-%d %H:%M')
-    post_date_print = time.strftime('%b %d %H:%M', post_date_print)
-    return post_date, post_date_print
+    post_date_layout = time.strptime(post_date, '%y-%m-%d %H:%M')
+    post_date_layout = time.strftime('%B %d %H:%M', post_date_layout)
+    post_date = post_date.replace('-', '').replace(':', '').replace(' ', '_')
+    return post_date, post_date_layout
 
 
 def traversal_weibo(url_target, weibo_name, page_sum):
@@ -245,15 +246,20 @@ def traversal_weibo(url_target, weibo_name, page_sum):
                 post = whole_post_tmp.xpath('//*[@id="M_"]/div[1]/span[@class="ctt"]')[0].xpath('string(.)')[1:]
             div_sum = target.xpath('//*[@id="%s"]/div' % post_id)
             if len(div_sum) == 1:  # 没图的情况
-                post_info = target.xpath('//*[@id="%s"]/div[1]/span[@class="ct"]/text()' % post_id)[0]
+                post_info = target.xpath('//*[@id="%s"]/div[1]/span[@class="ct"]' % post_id)[0].xpath('string(.)')
             elif len(div_sum) == 2:  # 有图的情况
-                post_info = target.xpath('//*[@id="%s"]/div[2]/span[@class="ct"]/text()' % post_id)[0]
+                post_info = target.xpath('//*[@id="%s"]/div[2]/span[@class="ct"]' % post_id)[0].xpath('string(.)')  # 发布的日期
 
-            post_date, post_date_print = get_date(post_info)
-            print_log('\n%s               (page %s of %s)' % (post_info, i, page_sum))
+            post_date, post_date_layout = get_date(post_info)
+            try:  # 如果使用IDLE的话，不能输出Non-BMP字符
+                print_log('\n%s            (page %s of %s)' % (post_info, i, page_sum))
+            except UnicodeEncodeError:
+                post_info = cut_line(post_info, '来')
+                print_log(post_info, '            (page %s of %s)' % (i, page_sum))
+            print_log(post, cout=False)
 
             post_name = weibo_name + '_' + post_date
-            make_pic(post, post_date_print, post_name, weibo_name)
+            make_pic(post, post_date_layout, post_name, weibo_name)
         if page_counter % 10 == 0:
             timer(10)
 
@@ -481,19 +487,21 @@ def format_post(post, formatted_post_date):
             width_counter += count_width(i, post)
         if (int(width_counter) == 37 or int(width_counter) == 38) and i != (len(post) - 1):
             formatted_post, width_counter, line_counter = change_line(post, i, formatted_post, width_counter, line_counter)
-    print_log(post, cout=False)
-    print(formatted_post)
+    try:
+        print(formatted_post)
+    except UnicodeEncodeError:
+        print('Sorry, Non-BMP character not supported in IDLE \nThis doesn\'t affect saving pic')
     return formatted_post, formatted_post_date, line_counter
 
 
 def make_pic(post, formatted_post_date, post_name, weibo_name):
     global page_counter
-    if os.path.isfile(os.path.join(os.path.abspath('weibo\\%s') % weibo_name, '\\%s.jpg' % post_name)):  # 这张微博已存在
-        pass
-        page_counter += 1
-    else:  # 保存图片
-        formatted_post, formatted_post_date, line_counter = format_post(post, formatted_post_date)
-        layout(formatted_post, formatted_post_date, line_counter, post_name, weibo_name)
+    # if os.path.isfile(os.path.join(os.path.abspath('weibo\\%s') % weibo_name, '\\%s.jpg' % post_name)):  # 这张微博已存在
+    #     pass
+    #     page_counter += 1
+    # else:  # 保存图片
+    formatted_post, formatted_post_date, line_counter = format_post(post, formatted_post_date)
+    layout(formatted_post, formatted_post_date, line_counter, post_name, weibo_name)
 
 
 def layout(formatted_post, formatted_post_date, line_counter, post_name, weibo_name):
@@ -508,8 +516,6 @@ def layout(formatted_post, formatted_post_date, line_counter, post_name, weibo_n
     if LAYOUT == LAYOUT_ONE or LAYOUT == LAYOUT_TWO:
         font_date = ImageFont.truetype(os.path.join(os.path.abspath('font'), 'RobotoSlab-Thin.ttf'), LAYOUT['date_size'])
         font_post = ImageFont.truetype(os.path.join(os.path.abspath('font'), FONT), LAYOUT['post_size'])
-        formatted_post_date = time.strptime(formatted_post_date, '%b %d %H:%M')
-        formatted_post_date = time.strftime('%B %d %H:%M', formatted_post_date)
         formatted_post_date = formatted_post_date[:-9] + '\n' + formatted_post_date[-8:-6]
         if LAYOUT == LAYOUT_ONE:
             font_bg = ImageFont.truetype(os.path.join(os.path.abspath('font'), 'NotoSansCJKsc-DemiLight.otf'), 1080)
@@ -520,12 +526,14 @@ def layout(formatted_post, formatted_post_date, line_counter, post_name, weibo_n
         elif LAYOUT == LAYOUT_TWO:
             draw.multiline_text(LAYOUT['text_site'], formatted_post, font=font_post, fill=COLOR_SCHEME['text'], spacing=LAYOUT['post_spacing'])
     elif LAYOUT == LAYOUT_THREE:
+        formatted_post_date = time.strptime(formatted_post_date, '%B %d %H:%M')
+        formatted_post_date = time.strftime('%b %d %H:%M', formatted_post_date)
+
         font_date = ImageFont.truetype(os.path.join(os.path.abspath('font'), FONT), LAYOUT['date_size'])
         font_post = ImageFont.truetype(os.path.join(os.path.abspath('font'), FONT), LAYOUT['post_size'])
         draw.text(LAYOUT['date_site'], formatted_post_date, font=font_date, fill=COLOR_SCHEME['text'])
         draw.multiline_text(LAYOUT['text_site'], formatted_post, font=font_post, fill=COLOR_SCHEME['text'], spacing=LAYOUT['post_spacing'])
     # image.show()
-    post_name = post_name.replace('-', '').replace(':', '').replace(' ', '_')  # 文件名不能包含:
     image.save(os.path.join(os.path.abspath('weibo'), weibo_name) + '\\%s.jpg' % post_name, 'jpeg')
 
 
